@@ -9,6 +9,11 @@
       "code": "AGENCY002",
       "name": "테스트대행사2",
       "active": true
+    },
+    {
+      "code": "ZIEL",
+      "name": "주식회사 통다글로벌로지스틱",
+      "active": true
     }
   ]
 }

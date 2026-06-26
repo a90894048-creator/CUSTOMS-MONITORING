@@ -95,6 +95,45 @@ app.get('/api/history', (req, res) => {
   res.json({ success: true, history: loadHistory() });
 });
 
+// ── 관리자 API (인증 없음 — URL 접근 제한으로 대체) ──────
+// 대행사 전체 조회
+app.get('/api/admin/agencies', (req, res) => {
+  res.json({ success: true, agencies: loadAgencies() });
+});
+
+// 대행사 추가
+app.post('/api/admin/agencies', (req, res) => {
+  const { code, name } = req.body;
+  if (!code || !name) return res.status(400).json({ success: false, message: '코드와 이름을 입력하세요.' });
+  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  if (data.agencies.find(a => a.code === code)) {
+    return res.status(400).json({ success: false, message: '이미 존재하는 코드입니다.' });
+  }
+  data.agencies.push({ code, name, active: true });
+  fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
+  res.json({ success: true, agencies: data.agencies });
+});
+
+// 대행사 수정 (이름 변경 / 활성화 토글)
+app.put('/api/admin/agencies/:code', (req, res) => {
+  const { name, active } = req.body;
+  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  const agency = data.agencies.find(a => a.code === req.params.code);
+  if (!agency) return res.status(404).json({ success: false, message: '대행사를 찾을 수 없습니다.' });
+  if (name !== undefined) agency.name = name;
+  if (active !== undefined) agency.active = active;
+  fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
+  res.json({ success: true, agencies: data.agencies });
+});
+
+// 대행사 삭제
+app.delete('/api/admin/agencies/:code', (req, res) => {
+  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  data.agencies = data.agencies.filter(a => a.code !== req.params.code);
+  fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
+  res.json({ success: true, agencies: data.agencies });
+});
+
 // 수동 즉시 롤링 트리거
 app.post('/api/roll-now', async (req, res) => {
   const { code } = req.body;

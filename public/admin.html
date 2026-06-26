@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 페이지 — 화물진행정보 모니터링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f2f5; color: #222; min-height: 100vh; }
+
+    header { background: #1a1a2e; color: #fff; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; }
+    .header-left .logo { font-size: 17px; font-weight: 700; }
+    .header-left .sub { font-size: 11px; opacity: 0.55; margin-top: 2px; }
+
+    #main-screen { padding: 24px 32px; max-width: 900px; margin: 0 auto; }
+
+    .page-title { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); padding: 24px 28px; margin-bottom: 20px; }
+    .card-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 8px; }
+
+    .add-form { display: flex; gap: 10px; align-items: flex-end; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 12px; color: #666; font-weight: 600; }
+    .form-group input { padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+    .form-group input:focus { border-color: #1a1a2e; }
+    .form-group input.code-input { width: 160px; font-family: 'Consolas', monospace; }
+    .form-group input.name-input { width: 220px; }
+    .btn-add { padding: 10px 22px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; height: 42px; white-space: nowrap; }
+    .btn-add:hover { background: #2d2d4e; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: #f5f5f5; padding: 11px 14px; text-align: left; font-weight: 700; color: #444; border-bottom: 2px solid #e0e0e0; }
+    thead th.center { text-align: center; }
+    tbody td { padding: 12px 14px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+
+    .code-mono { font-family: 'Consolas', monospace; font-weight: 700; font-size: 13px; color: #1a1a2e; background: #f0f0f5; padding: 3px 8px; border-radius: 5px; }
+
+    .toggle-wrap { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .toggle { position: relative; width: 42px; height: 22px; cursor: pointer; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 22px; transition: 0.2s; }
+    .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+    .toggle input:checked + .toggle-slider { background: #2e7d32; }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+    .toggle-label { font-size: 12px; color: #888; min-width: 36px; }
+    .toggle-label.on { color: #2e7d32; font-weight: 700; }
+
+    .btn-edit { padding: 5px 12px; background: #fff; color: #1a1a2e; border: 1.5px solid #ddd; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .btn-edit:hover { border-color: #1a1a2e; }
+    .btn-del { padding: 5px 12px; background: #fff; color: #c62828; border: 1.5px solid #ffcdd2; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; }
+    .btn-del:hover { background: #fdecea; }
+
+    .edit-input { padding: 5px 10px; border: 1.5px solid #1a1a2e; border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; width: 180px; }
+    .btn-save { padding: 5px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 6px; }
+    .btn-cancel { padding: 5px 10px; background: #fff; color: #888; border: 1.5px solid #ddd; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: 4px; }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; z-index: 999; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: #c62828; }
+
+    .empty { text-align: center; padding: 32px; color: #bbb; font-size: 13px; }
+    .info-box { background: #e8f4fd; border-left: 4px solid #1565c0; border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 13px; color: #1565c0; margin-bottom: 20px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo">🔧 관리자 페이지</div>
+    <div class="sub">화물진행정보 모니터링 · 대행사 코드 관리</div>
+  </div>
+  <a href="/" style="color:rgba(255,255,255,0.7);font-size:12px;text-decoration:none">← 모니터링 화면</a>
+</header>
+
+<div class="toast" id="toast"></div>
+
+<div id="main-screen">
+  <br>
+  <div class="page-title">🏢 대행사 관리</div>
+
+  <div class="info-box">
+    대행사 코드는 모니터링 화면 로그인 시 사용됩니다.<br>
+    코드는 영문/숫자 조합을 권장합니다. 비활성화 시 해당 코드로 로그인이 차단됩니다.
+  </div>
+
+  <div class="card">
+    <div class="card-title">➕ 대행사 추가</div>
+    <div class="add-form">
+      <div class="form-group">
+        <label>대행사 코드</label>
+        <input class="code-input" type="text" id="new-code" placeholder="예: AGENCY001" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label>대행사 이름</label>
+        <input class="name-input" type="text" id="new-name" placeholder="예: 한국통관대행사" autocomplete="off" />
+      </div>
+      <button class="btn-add" onclick="doAdd()">+ 추가</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 대행사 목록 <span id="agency-count" style="font-size:13px;color:#888;font-weight:400"></span></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px" class="center">#</th>
+            <th>대행사 코드</th>
+            <th>대행사 이름</th>
+            <th class="center" style="width:100px">활성화</th>
+            <th class="center" style="width:140px">관리</th>
+          </tr>
+        </thead>
+        <tbody id="agency-tbody">
+          <tr><td colspan="5" class="empty">로딩 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('new-code').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('new-name').focus(); });
+  document.getElementById('new-name').addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+
+  async function loadAgencies() {
+    try {
+      const res = await fetch('/api/admin/agencies');
+      const data = await res.json();
+      if (data.success) renderTable(data.agencies);
+    } catch { showToast('불러오기 실패', true); }
+  }
+
+  function renderTable(agencies) {
+    const tbody = document.getElementById('agency-tbody');
+    document.getElementById('agency-count').textContent = `(${agencies.length}개)`;
+    if (agencies.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">등록된 대행사가 없습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = agencies.map((a, i) => `
+      <tr id="row-${a.code}">
+        <td style="text-align:center;color:#aaa">${i + 1}</td>
+        <td><span class="code-mono">${a.code}</span></td>
+        <td id="name-cell-${a.code}">${a.name}</td>
+        <td>
+          <div class="toggle-wrap">
+            <label class="toggle">
+              <input type="checkbox" ${a.active ? 'checked' : ''} onchange="doToggle('${a.code}', this.checked)" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label ${a.active ? 'on' : ''}">${a.active ? '활성' : '비활성'}</span>
+          </div>
+        </td>
+        <td style="text-align:center">
+          <button class="btn-edit" onclick="startEdit('${a.code}', '${a.name}')">수정</button>
+          <button class="btn-del" onclick="doDelete('${a.code}', '${a.name}')">삭제</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function doAdd() {
+    const code = document.getElementById('new-code').value.trim().toUpperCase();
+    const name = document.getElementById('new-name').value.trim();
+    if (!code || !name) { showToast('코드와 이름을 모두 입력하세요.', true); return; }
+    try {
+      const res = await fetch('/api/admin/agencies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('new-code').value = '';
+        document.getElementById('new-name').value = '';
+        renderTable(data.agencies);
+        showToast(`${name} 추가 완료`);
+      } else { showToast(data.message, true); }
+    } catch { showToast('추가 실패', true); }
+  }
+
+  async function doToggle(code, active) {
+    try {
+      const res = await fetch(`/api/admin/agencies/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active })
+      });
+      const data = await res.json();
+      if (data.success) { renderTable(data.agencies); showToast(active ? '활성화 완료' : '비활성화 완료'); }
+    } catch { showToast('변경 실패', true); }
+  }
+
+  function startEdit(code, currentName) {
+    const cell = document.getElementById(`name-cell-${code}`);
+    cell.innerHTML = `
+      <input class="edit-input" type="text" id="edit-input-${code}" value="${currentName}" />
+      <button class="btn-save" onclick="doSaveEdit('${code}')">저장</button>
+      <button class="btn-cancel" onclick="loadAgencies()">취소</button>
+    `;
+    document.getElementById(`edit-input-${code}`).focus();
+    document.getElementById(`edit-input-${code}`).addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSaveEdit(code);
+      if (e.key === 'Escape') loadAgencies();
+    });
+  }
+
+  async function doSaveEdit(code) {
+    const name = document.getElementById(`edit-input-${code}`).value.trim();
+    if (!name) { showToast('이름을 입력하세요.', true); return; }
+    try {
+      const res = await fetch(`/api/admin/agencies/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (data.success) { renderTable(data.agencies); showToast('수정 완료'); }
+    } catch { showToast('수정 실패', true); }
+  }
+
+  async function doDelete(code, name) {
+    if (!confirm(`"${name}" (${code}) 을(를) 삭제하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`/api/admin/agencies/${code}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.success) { renderTable(data.agencies); showToast(`${name} 삭제 완료`); }
+    } catch { showToast('삭제 실패', true); }
+  }
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(() => { t.className = 'toast'; }, 2500);
+  }
+
+  loadAgencies();
+</script>
+</body>
+</html>
