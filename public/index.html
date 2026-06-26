@@ -104,6 +104,17 @@
     .btn-del { background: none; border: none; color: #bbb; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
     .btn-del:hover { color: #c62828; }
 
+    /* 조회기간 필터 */
+    .date-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .date-filter label { font-size: 12px; color: #555; font-weight: 600; white-space: nowrap; }
+    .date-filter input[type="date"] { padding: 6px 10px; border: 1.5px solid #ddd; border-radius: 7px; font-size: 12px; font-family: inherit; outline: none; color: #333; }
+    .date-filter input[type="date"]:focus { border-color: #003087; }
+    .btn-filter { padding: 6px 16px; background: #003087; color: #fff; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-filter:hover { background: #0048c8; }
+    .btn-filter-reset { padding: 6px 12px; background: #fff; color: #888; border: 1.5px solid #ddd; border-radius: 7px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .btn-filter-reset:hover { border-color: #888; }
+    .filter-result { font-size: 11px; color: #888; margin-left: 4px; }
+
     .legend { display: flex; gap: 14px; margin-bottom: 10px; font-size: 11px; color: #666; align-items: center; }
     .leg { display: flex; align-items: center; gap: 5px; }
     .leg-box { width: 14px; height: 14px; border-radius: 3px; }
@@ -144,10 +155,11 @@
 <!-- 로그인 -->
 <div id="login-screen">
   <div class="login-card">
-    <h2>대행사 코드 입력</h2>
-    <p>발급받은 대행사 코드를 입력하세요</p>
+    <h2>대행사 로그인</h2>
+    <p>발급받은 대행사 코드와 비밀번호를 입력하세요</p>
     <input type="text" id="code-input" placeholder="대행사 코드" autocomplete="off" />
-    <button onclick="doLogin()">확인</button>
+    <input type="password" id="pw-input" placeholder="비밀번호" autocomplete="off" />
+    <button onclick="doLogin()">로그인</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -180,6 +192,17 @@
       <input class="hbl-input" type="text" id="hbl-input" placeholder="HBL 번호 입력" autocomplete="off" />
       <input class="year-input" type="text" id="year-input" placeholder="년도" maxlength="4" />
       <button class="btn-add" onclick="doAddBl()">+ 등록</button>
+    </div>
+
+    <!-- 조회기간 필터 -->
+    <div class="date-filter">
+      <label>조회기간</label>
+      <input type="date" id="date-from" />
+      <span style="font-size:12px;color:#888">~</span>
+      <input type="date" id="date-to" />
+      <button class="btn-filter" onclick="applyDateFilter()">조회</button>
+      <button class="btn-filter-reset" onclick="resetDateFilter()">전체보기</button>
+      <span class="filter-result" id="filter-result"></span>
     </div>
 
     <!-- 범례 -->
@@ -219,19 +242,22 @@
   let agencyCode = '';
   let agencyName = '';
   let nextRollTimer = null;
-  const ROLL_INTERVAL = 10 * 60; // 10분(초)
+  let allBls = [];
+  const ROLL_INTERVAL = 10 * 60;
 
   // ── 인증 ──────────────────────────────
-  document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pw-input').focus(); });
+  document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('hbl-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAddBl(); });
 
   async function doLogin() {
     const code = document.getElementById('code-input').value.trim();
+    const password = document.getElementById('pw-input').value;
     if (!code) return;
     const errEl = document.getElementById('login-error');
     errEl.textContent = '';
     try {
-      const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+      const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, password }) });
       const data = await res.json();
       if (data.success) {
         agencyCode = code;
@@ -243,6 +269,11 @@
         document.getElementById('rolling-badge').style.display = 'flex';
         document.getElementById('logout-btn').style.display = '';
         document.getElementById('year-input').value = new Date().getFullYear();
+        // 기본 조회기간: 오늘 기준 30일
+        const today = new Date();
+        const from = new Date(today); from.setDate(from.getDate() - 30);
+        document.getElementById('date-to').value = today.toISOString().slice(0,10);
+        document.getElementById('date-from').value = from.toISOString().slice(0,10);
         await loadBls();
         startCountdown();
       } else {
@@ -252,14 +283,36 @@
   }
 
   function doLogout() {
-    agencyCode = ''; agencyName = '';
+    agencyCode = ''; agencyName = ''; allBls = [];
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('main-screen').style.display = 'none';
     document.getElementById('agency-badge').style.display = 'none';
     document.getElementById('rolling-badge').style.display = 'none';
     document.getElementById('logout-btn').style.display = 'none';
     document.getElementById('code-input').value = '';
+    document.getElementById('pw-input').value = '';
     if (nextRollTimer) clearInterval(nextRollTimer);
+  }
+
+  // ── 조회기간 필터 ──────────────────────
+  function applyDateFilter() {
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    const filtered = allBls.filter(bl => {
+      const d = (bl.registeredAt || '').slice(0, 10);
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    });
+    document.getElementById('filter-result').textContent = `${filtered.length}건 표시 중 (전체 ${allBls.length}건)`;
+    renderTable(filtered);
+  }
+
+  function resetDateFilter() {
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value = '';
+    document.getElementById('filter-result').textContent = '';
+    renderTable(allBls);
   }
 
   // ── 카운트다운 ──────────────────────
@@ -284,7 +337,10 @@
     try {
       const res = await fetch(`/api/bls?code=${agencyCode}`);
       const data = await res.json();
-      if (data.success) renderTable(data.bls);
+      if (data.success) {
+        allBls = data.bls;
+        applyDateFilter();
+      }
     } catch {}
   }
 
@@ -336,7 +392,7 @@
         body: JSON.stringify({ code: agencyCode })
       });
       const data = await res.json();
-      if (data.success) { renderTable(data.bls); secondsLeft = ROLL_INTERVAL; }
+      if (data.success) { allBls = data.bls; applyDateFilter(); secondsLeft = ROLL_INTERVAL; }
     } catch {}
     hideLoading();
     btn.disabled = false;

@@ -92,11 +92,15 @@
     <div class="add-form">
       <div class="form-group">
         <label>대행사 코드</label>
-        <input class="code-input" type="text" id="new-code" placeholder="예: AGENCY001" autocomplete="off" />
+        <input class="code-input" type="text" id="new-code" placeholder="예: ZIEL" autocomplete="off" />
       </div>
       <div class="form-group">
         <label>대행사 이름</label>
         <input class="name-input" type="text" id="new-name" placeholder="예: 한국통관대행사" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label>비밀번호</label>
+        <input class="code-input" type="password" id="new-pw" placeholder="로그인 비밀번호" autocomplete="off" />
       </div>
       <button class="btn-add" onclick="doAdd()">+ 추가</button>
     </div>
@@ -111,8 +115,9 @@
             <th style="width:40px" class="center">#</th>
             <th>대행사 코드</th>
             <th>대행사 이름</th>
+            <th class="center" style="width:90px">비밀번호</th>
             <th class="center" style="width:100px">활성화</th>
-            <th class="center" style="width:140px">관리</th>
+            <th class="center" style="width:160px">관리</th>
           </tr>
         </thead>
         <tbody id="agency-tbody">
@@ -125,7 +130,8 @@
 
 <script>
   document.getElementById('new-code').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('new-name').focus(); });
-  document.getElementById('new-name').addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+  document.getElementById('new-name').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('new-pw').focus(); });
+  document.getElementById('new-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
 
   async function loadAgencies() {
     try {
@@ -139,7 +145,7 @@
     const tbody = document.getElementById('agency-tbody');
     document.getElementById('agency-count').textContent = `(${agencies.length}개)`;
     if (agencies.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">등록된 대행사가 없습니다.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">등록된 대행사가 없습니다.</td></tr>';
       return;
     }
     tbody.innerHTML = agencies.map((a, i) => `
@@ -147,6 +153,9 @@
         <td style="text-align:center;color:#aaa">${i + 1}</td>
         <td><span class="code-mono">${a.code}</span></td>
         <td id="name-cell-${a.code}">${a.name}</td>
+        <td style="text-align:center">
+          ${a.password ? '<span style="color:#2e7d32;font-size:12px;font-weight:700">설정됨</span>' : '<span style="color:#bbb;font-size:12px">미설정</span>'}
+        </td>
         <td>
           <div class="toggle-wrap">
             <label class="toggle">
@@ -158,6 +167,7 @@
         </td>
         <td style="text-align:center">
           <button class="btn-edit" onclick="startEdit('${a.code}', '${a.name}')">수정</button>
+          <button class="btn-edit" onclick="startPwEdit('${a.code}')">비밀번호</button>
           <button class="btn-del" onclick="doDelete('${a.code}', '${a.name}')">삭제</button>
         </td>
       </tr>
@@ -167,17 +177,19 @@
   async function doAdd() {
     const code = document.getElementById('new-code').value.trim().toUpperCase();
     const name = document.getElementById('new-name').value.trim();
+    const password = document.getElementById('new-pw').value.trim();
     if (!code || !name) { showToast('코드와 이름을 모두 입력하세요.', true); return; }
     try {
       const res = await fetch('/api/admin/agencies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, name })
+        body: JSON.stringify({ code, name, password })
       });
       const data = await res.json();
       if (data.success) {
         document.getElementById('new-code').value = '';
         document.getElementById('new-name').value = '';
+        document.getElementById('new-pw').value = '';
         renderTable(data.agencies);
         showToast(`${name} 추가 완료`);
       } else { showToast(data.message, true); }
@@ -210,6 +222,22 @@
     });
   }
 
+  function startPwEdit(code) {
+    const cell = document.getElementById(`name-cell-${code}`);
+    const currentName = cell.textContent.trim();
+    cell.innerHTML = `
+      <span style="font-size:12px;color:#888">${currentName}</span>
+      <input class="edit-input" type="password" id="pw-edit-${code}" placeholder="새 비밀번호" style="width:130px;margin-left:8px" />
+      <button class="btn-save" onclick="doSavePw('${code}')">저장</button>
+      <button class="btn-cancel" onclick="loadAgencies()">취소</button>
+    `;
+    document.getElementById(`pw-edit-${code}`).focus();
+    document.getElementById(`pw-edit-${code}`).addEventListener('keydown', e => {
+      if (e.key === 'Enter') doSavePw(code);
+      if (e.key === 'Escape') loadAgencies();
+    });
+  }
+
   async function doSaveEdit(code) {
     const name = document.getElementById(`edit-input-${code}`).value.trim();
     if (!name) { showToast('이름을 입력하세요.', true); return; }
@@ -222,6 +250,19 @@
       const data = await res.json();
       if (data.success) { renderTable(data.agencies); showToast('수정 완료'); }
     } catch { showToast('수정 실패', true); }
+  }
+
+  async function doSavePw(code) {
+    const password = document.getElementById(`pw-edit-${code}`).value;
+    try {
+      const res = await fetch(`/api/admin/agencies/${code}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (data.success) { renderTable(data.agencies); showToast('비밀번호 변경 완료'); }
+    } catch { showToast('변경 실패', true); }
   }
 
   async function doDelete(code, name) {

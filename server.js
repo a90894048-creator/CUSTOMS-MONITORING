@@ -18,15 +18,15 @@ function loadAgencies() {
   return JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8')).agencies;
 }
 
-// 대행사 인증
+// 대행사 인증 (코드 + 비밀번호)
 app.post('/api/auth', (req, res) => {
-  const { code } = req.body;
+  const { code, password } = req.body;
   const agency = loadAgencies().find(a => a.code === code && a.active);
-  if (agency) {
-    res.json({ success: true, name: agency.name });
-  } else {
-    res.status(401).json({ success: false, message: '유효하지 않은 대행사 코드입니다.' });
+  if (!agency) return res.status(401).json({ success: false, message: '유효하지 않은 대행사 코드입니다.' });
+  if (agency.password && agency.password !== password) {
+    return res.status(401).json({ success: false, message: '비밀번호가 틀렸습니다.' });
   }
+  res.json({ success: true, name: agency.name });
 });
 
 // HBL 목록 조회 — 로그인한 대행사 코드에 해당하는 HBL만 반환
@@ -103,24 +103,25 @@ app.get('/api/admin/agencies', (req, res) => {
 });
 
 app.post('/api/admin/agencies', (req, res) => {
-  const { code, name } = req.body;
+  const { code, name, password = '' } = req.body;
   if (!code || !name) return res.status(400).json({ success: false, message: '코드와 이름을 입력하세요.' });
   const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
   if (data.agencies.find(a => a.code === code)) {
     return res.status(400).json({ success: false, message: '이미 존재하는 코드입니다.' });
   }
-  data.agencies.push({ code, name, active: true });
+  data.agencies.push({ code, name, active: true, password });
   fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
   res.json({ success: true, agencies: data.agencies });
 });
 
 app.put('/api/admin/agencies/:code', (req, res) => {
-  const { name, active } = req.body;
+  const { name, active, password } = req.body;
   const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
   const agency = data.agencies.find(a => a.code === req.params.code);
   if (!agency) return res.status(404).json({ success: false, message: '대행사를 찾을 수 없습니다.' });
   if (name !== undefined) agency.name = name;
   if (active !== undefined) agency.active = active;
+  if (password !== undefined) agency.password = password;
   fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
   res.json({ success: true, agencies: data.agencies });
 });
