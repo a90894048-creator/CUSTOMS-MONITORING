@@ -14,8 +14,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const AGENCIES_FILE = path.join(__dirname, 'agencies.json');
 
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, ''));
+}
+
 function loadAgencies() {
-  return JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8')).agencies;
+  return readJson(AGENCIES_FILE).agencies;
 }
 
 // 대행사 인증 (코드 + 비밀번호)
@@ -105,7 +109,7 @@ app.get('/api/admin/agencies', (req, res) => {
 app.post('/api/admin/agencies', (req, res) => {
   const { code, name, password = '' } = req.body;
   if (!code || !name) return res.status(400).json({ success: false, message: '코드와 이름을 입력하세요.' });
-  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  const data = readJson(AGENCIES_FILE);
   if (data.agencies.find(a => a.code === code)) {
     return res.status(400).json({ success: false, message: '이미 존재하는 코드입니다.' });
   }
@@ -116,7 +120,7 @@ app.post('/api/admin/agencies', (req, res) => {
 
 app.put('/api/admin/agencies/:code', (req, res) => {
   const { name, active, password } = req.body;
-  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  const data = readJson(AGENCIES_FILE);
   const agency = data.agencies.find(a => a.code === req.params.code);
   if (!agency) return res.status(404).json({ success: false, message: '대행사를 찾을 수 없습니다.' });
   if (name !== undefined) agency.name = name;
@@ -127,7 +131,7 @@ app.put('/api/admin/agencies/:code', (req, res) => {
 });
 
 app.delete('/api/admin/agencies/:code', (req, res) => {
-  const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
+  const data = readJson(AGENCIES_FILE);
   data.agencies = data.agencies.filter(a => a.code !== req.params.code);
   fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
   res.json({ success: true, agencies: data.agencies });
