@@ -101,13 +101,14 @@ app.get('/api/history', (req, res) => {
   res.json({ success: true, history });
 });
 
-// XML 폴더 대행사 코드 목록 확인 (진단용)
+// XML 폴더 대행사 코드 목록 확인 (진단용) — send + recv 동시
 app.get('/api/admin/xml-agents', (req, res) => {
   const SEND_XML_DIR = process.env.SEND_XML_DIR || '';
-  if (!SEND_XML_DIR) return res.json({ success: false, message: 'SEND_XML_DIR 미설정' });
-  const fs2 = require('fs');
-  const path2 = require('path');
-  if (!fs2.existsSync(SEND_XML_DIR)) return res.json({ success: false, message: '폴더 접근 불가: ' + SEND_XML_DIR });
+  const RECV_XML_DIR = process.env.RECV_XML_DIR || '';
+  const dirs = [];
+  if (SEND_XML_DIR) dirs.push({ dir: SEND_XML_DIR, label: 'SEND' });
+  if (RECV_XML_DIR) dirs.push({ dir: RECV_XML_DIR, label: 'RECV' });
+  if (dirs.length === 0) return res.json({ success: false, message: 'SEND_XML_DIR / RECV_XML_DIR 미설정' });
 
   function stripNs(xml) {
     return xml.replace(/\s+xmlns(?::[a-zA-Z0-9_]+)?="[^"]*"/g, '')
@@ -115,22 +116,29 @@ app.get('/api/admin/xml-agents', (req, res) => {
               .replace(/<(\/?)[a-zA-Z0-9_]+:([a-zA-Z0-9_])/g, '<$1$2');
   }
 
-  const counts = {};
-  try {
-    const files = fs2.readdirSync(SEND_XML_DIR).filter(f => f.toLowerCase().endsWith('.xml'));
-    for (const f of files) {
-      try {
-        const raw = fs2.readFileSync(path2.join(SEND_XML_DIR, f), 'utf8');
-        const clean = stripNs(raw);
-        const m = clean.match(/<GoodsShipment[^>]*>[\s\S]*?<Agent>\s*<ID>([^<]{1,20})<\/ID>/);
-        const code = m ? m[1].trim() : '(없음)';
-        counts[code] = (counts[code] || 0) + 1;
-      } catch {}
+  const result = {};
+  let totalFiles = 0;
+  for (const { dir, label } of dirs) {
+    if (!fs.existsSync(dir)) { result[label] = { error: '폴더 접근 불가: ' + dir }; continue; }
+    const counts = {};
+    try {
+      const files = fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.xml'));
+      totalFiles += files.length;
+      for (const f of files) {
+        try {
+          const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+          const clean = stripNs(raw);
+          const m = clean.match(/<GoodsShipment[^>]*>[\s\S]*?<Agent>\s*<ID>([^<]{1,20})<\/ID>/);
+          const code = m ? m[1].trim() : '(없음)';
+          counts[code] = (counts[code] || 0) + 1;
+        } catch {}
+      }
+      result[label] = { files: files.length, agentCodes: counts };
+    } catch (e) {
+      result[label] = { error: e.message };
     }
-    res.json({ success: true, totalFiles: files.length, agentCodes: counts });
-  } catch (e) {
-    res.json({ success: false, message: e.message });
   }
+  res.json({ success: true, totalFiles, dirs: result });
 });
 
 // ── 관리자 API ───────────────────────────────────────────────
