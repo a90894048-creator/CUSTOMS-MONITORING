@@ -115,6 +115,10 @@
     .btn-filter-reset:hover { border-color: #888; }
     .filter-result { font-size: 11px; color: #888; margin-left: 4px; }
 
+    /* 직접입력 토글 */
+    .btn-manual-toggle { background: none; border: 1.5px dashed #aaa; color: #555; border-radius: 7px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .btn-manual-toggle:hover { border-color: #003087; color: #003087; }
+
     .legend { display: flex; gap: 14px; margin-bottom: 10px; font-size: 11px; color: #666; align-items: center; }
     .leg { display: flex; align-items: center; gap: 5px; }
     .leg-box { width: 14px; height: 14px; border-radius: 3px; }
@@ -198,6 +202,19 @@
       <span class="filter-result" id="filter-result"></span>
     </div>
 
+    <!-- 직접 HBL 입력 -->
+    <div style="margin-bottom:10px">
+      <button class="btn-manual-toggle" id="btn-manual-toggle" onclick="toggleManualForm()">+ HBL 직접 입력</button>
+      <div id="manual-form-wrap" style="display:none;margin-top:8px">
+        <div class="add-form">
+          <input type="text" id="hbl-input" class="hbl-input" placeholder="HBL 번호" autocomplete="off" />
+          <input type="number" id="year-input" class="year-input" value="2026" min="2020" max="2099" />
+          <button class="btn-add" onclick="doAddBl()">등록</button>
+          <span id="add-msg" style="font-size:12px;color:#888;margin-left:8px"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- 범례 -->
     <div class="legend">
       <div class="leg"><div class="leg-box" style="background:#dce8f8;border:1px solid #aac"></div> 조회중</div>
@@ -223,7 +240,7 @@
           </tr>
         </thead>
         <tbody id="main-tbody">
-          <tr><td colspan="10" class="empty">등록된 HBL이 없습니다.<br>위 입력창에서 HBL 번호를 등록하세요.</td></tr>
+          <tr><td colspan="10" class="empty">조회 결과가 없습니다.<br>조회기간을 설정하고 <b>조회</b> 버튼을 누르거나, <b>HBL 직접 입력</b>으로 등록하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -493,6 +510,53 @@
     if (!iso) return '-';
     const d = new Date(iso);
     return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  // ── 직접 HBL 입력 ─────────────────
+  function toggleManualForm() {
+    const wrap = document.getElementById('manual-form-wrap');
+    const btn  = document.getElementById('btn-manual-toggle');
+    const open = wrap.style.display === 'none';
+    wrap.style.display = open ? 'block' : 'none';
+    btn.textContent = open ? '- HBL 직접 입력 닫기' : '+ HBL 직접 입력';
+    if (open) {
+      document.getElementById('hbl-input').focus();
+      // 기본 연도: 현재 연도
+      document.getElementById('year-input').value = new Date().getFullYear();
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.activeElement === document.getElementById('hbl-input')) doAddBl();
+  });
+
+  async function doAddBl() {
+    const hblNo = document.getElementById('hbl-input').value.trim().toUpperCase();
+    const blYy  = document.getElementById('year-input').value.trim();
+    const msgEl = document.getElementById('add-msg');
+    if (!hblNo) { msgEl.textContent = 'HBL 번호를 입력하세요.'; msgEl.style.color = '#c62828'; return; }
+    if (!blYy || blYy.length !== 4) { msgEl.textContent = '연도 4자리를 입력하세요.'; msgEl.style.color = '#c62828'; return; }
+    msgEl.textContent = '등록 중...'; msgEl.style.color = '#888';
+    try {
+      const res = await fetch('/api/bls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode, hblNo, blYy })
+      });
+      const data = await res.json();
+      if (data.success) {
+        msgEl.textContent = `✓ ${hblNo} 등록 완료`;
+        msgEl.style.color = '#2e7d32';
+        document.getElementById('hbl-input').value = '';
+        allBls = [...allBls.filter(b => b.hblNo !== hblNo), data.bl];
+        applyDateFilter();
+      } else {
+        msgEl.textContent = data.message || '등록 실패';
+        msgEl.style.color = '#c62828';
+      }
+    } catch {
+      msgEl.textContent = '서버 오류'; msgEl.style.color = '#c62828';
+    }
   }
 
   function showLoading(msg) {
