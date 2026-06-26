@@ -153,8 +153,8 @@
         <td style="text-align:center;color:#aaa">${i + 1}</td>
         <td><span class="code-mono">${a.code}</span></td>
         <td id="name-cell-${a.code}">${a.name}</td>
-        <td style="text-align:center">
-          ${a.password ? '<span style="color:#2e7d32;font-size:12px;font-weight:700">설정됨</span>' : '<span style="color:#bbb;font-size:12px">미설정</span>'}
+        <td style="text-align:center;font-family:'Consolas',monospace;font-size:12px;color:#333">
+          ${a.password || '<span style="color:#bbb">미설정</span>'}
         </td>
         <td>
           <div class="toggle-wrap">
@@ -227,7 +227,7 @@
     const currentName = cell.textContent.trim();
     cell.innerHTML = `
       <span style="font-size:12px;color:#888">${currentName}</span>
-      <input class="edit-input" type="password" id="pw-edit-${code}" placeholder="새 비밀번호" style="width:130px;margin-left:8px" />
+      <input class="edit-input" type="text" id="pw-edit-${code}" placeholder="새 비밀번호" style="width:130px;margin-left:8px" />
       <button class="btn-save" onclick="doSavePw('${code}')">저장</button>
       <button class="btn-cancel" onclick="loadAgencies()">취소</button>
     `;
