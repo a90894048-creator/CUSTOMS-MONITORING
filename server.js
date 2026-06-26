@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const cron = require('node-cron');
 const { rollAll, loadBls, saveBls, loadHistory, queryApi } = require('./roller');
+const { startWatcher } = require('./xml-watcher');
 
 const app = express();
 app.use(cors());
@@ -28,15 +29,16 @@ app.post('/api/auth', (req, res) => {
   }
 });
 
-// 전체 HBL 목록 + 현황 조회
+// HBL 목록 조회 — 로그인한 대행사 코드에 해당하는 HBL만 반환
 app.get('/api/bls', (req, res) => {
   const { code } = req.query;
   const agency = loadAgencies().find(a => a.code === code && a.active);
   if (!agency) return res.status(401).json({ success: false, message: '인증 실패' });
-  res.json({ success: true, bls: loadBls() });
+  const bls = loadBls().filter(b => !b.agencyCode || b.agencyCode === code);
+  res.json({ success: true, bls });
 });
 
-// HBL 등록
+// HBL 등록 — 대행사 코드를 함께 저장
 app.post('/api/bls', async (req, res) => {
   const { code, hblNo, blYy } = req.body;
   const agency = loadAgencies().find(a => a.code === code && a.active);
@@ -47,12 +49,12 @@ app.post('/api/bls', async (req, res) => {
     return res.status(400).json({ success: false, message: '이미 등록된 HBL입니다.' });
   }
 
-  // 등록 즉시 1회 조회
   const result = await queryApi(hblNo, blYy);
   const now = new Date().toISOString();
   const newBl = {
     hblNo,
     blYy,
+    agencyCode: code,
     registeredAt: now,
     currentStatus: result?.mtTrgtCargYnNm || '-',
     prgsStts: result?.prgsStts || '-',
@@ -66,7 +68,6 @@ app.post('/api/bls', async (req, res) => {
     progressHistory: []
   };
 
-  // 최초 상태가 검사 관련이면 이력에 추가
   if (result?.mtTrgtCargYnNm && result.mtTrgtCargYnNm !== '-' && result.mtTrgtCargYnNm !== '비대상') {
     newBl.progressHistory.push({ status: result.mtTrgtCargYnNm, detectedAt: now });
   }
@@ -76,32 +77,31 @@ app.post('/api/bls', async (req, res) => {
   res.json({ success: true, bl: newBl });
 });
 
-// HBL 삭제
+// HBL 삭제 — 자기 대행사 HBL만 삭제 가능
 app.delete('/api/bls/:hblNo', (req, res) => {
   const { code } = req.body;
   const agency = loadAgencies().find(a => a.code === code && a.active);
   if (!agency) return res.status(401).json({ success: false, message: '인증 실패' });
 
-  const bls = loadBls().filter(b => b.hblNo !== req.params.hblNo);
+  const bls = loadBls().filter(b => !(b.hblNo === req.params.hblNo && (!b.agencyCode || b.agencyCode === code)));
   saveBls(bls);
   res.json({ success: true });
 });
 
-// 변화 이력 조회
+// 변화 이력 조회 — 로그인 대행사 코드 필터
 app.get('/api/history', (req, res) => {
   const { code } = req.query;
   const agency = loadAgencies().find(a => a.code === code && a.active);
   if (!agency) return res.status(401).json({ success: false, message: '인증 실패' });
-  res.json({ success: true, history: loadHistory() });
+  const history = loadHistory().filter(h => !h.agencyCode || h.agencyCode === code);
+  res.json({ success: true, history });
 });
 
-// ── 관리자 API (인증 없음 — URL 접근 제한으로 대체) ──────
-// 대행사 전체 조회
+// ── 관리자 API ───────────────────────────────────────────────
 app.get('/api/admin/agencies', (req, res) => {
   res.json({ success: true, agencies: loadAgencies() });
 });
 
-// 대행사 추가
 app.post('/api/admin/agencies', (req, res) => {
   const { code, name } = req.body;
   if (!code || !name) return res.status(400).json({ success: false, message: '코드와 이름을 입력하세요.' });
@@ -114,7 +114,6 @@ app.post('/api/admin/agencies', (req, res) => {
   res.json({ success: true, agencies: data.agencies });
 });
 
-// 대행사 수정 (이름 변경 / 활성화 토글)
 app.put('/api/admin/agencies/:code', (req, res) => {
   const { name, active } = req.body;
   const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
@@ -126,7 +125,6 @@ app.put('/api/admin/agencies/:code', (req, res) => {
   res.json({ success: true, agencies: data.agencies });
 });
 
-// 대행사 삭제
 app.delete('/api/admin/agencies/:code', (req, res) => {
   const data = JSON.parse(fs.readFileSync(AGENCIES_FILE, 'utf-8'));
   data.agencies = data.agencies.filter(a => a.code !== req.params.code);
@@ -134,19 +132,21 @@ app.delete('/api/admin/agencies/:code', (req, res) => {
   res.json({ success: true, agencies: data.agencies });
 });
 
-// 수동 즉시 롤링 트리거
+// 수동 즉시 롤링 — 해당 대행사 HBL만 반환
 app.post('/api/roll-now', async (req, res) => {
   const { code } = req.body;
   const agency = loadAgencies().find(a => a.code === code && a.active);
   if (!agency) return res.status(401).json({ success: false, message: '인증 실패' });
   await rollAll();
-  res.json({ success: true, bls: loadBls() });
+  const bls = loadBls().filter(b => !b.agencyCode || b.agencyCode === code);
+  res.json({ success: true, bls });
 });
 
-// 10분마다 자동 롤링 (*/10 * * * *)
-cron.schedule('*/10 * * * *', () => {
-  rollAll();
-});
+// 10분마다 자동 롤링
+cron.schedule('*/10 * * * *', () => { rollAll(); });
+
+// send_xml 폴더 감시 → 신규 HBL 자동 등록
+startWatcher();
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
