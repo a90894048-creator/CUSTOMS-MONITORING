@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const cron = require('node-cron');
 const { rollAll, loadBls, saveBls, loadHistory, queryApi } = require('./roller');
-const { startWatcher } = require('./xml-watcher');
+const { startWatcher, scanForAgency } = require('./xml-watcher');
 
 const app = express();
 app.use(cors());
@@ -131,6 +131,26 @@ app.delete('/api/admin/agencies/:code', (req, res) => {
   data.agencies = data.agencies.filter(a => a.code !== req.params.code);
   fs.writeFileSync(AGENCIES_FILE, JSON.stringify(data, null, 2));
   res.json({ success: true, agencies: data.agencies });
+});
+
+// XML 폴더 스캔 → 대행사 HBL 일괄 등록 후 날짜 필터 결과 반환
+app.post('/api/bls/scan', async (req, res) => {
+  const { code, fromDate, toDate } = req.body;
+  const agency = loadAgencies().find(a => a.code === code && a.active);
+  if (!agency) return res.status(401).json({ success: false, message: '인증 실패' });
+
+  const scanResult = await scanForAgency(code, fromDate || null, toDate || null);
+
+  const bls = loadBls()
+    .filter(b => b.agencyCode === code)
+    .filter(b => {
+      const d = b.blDate || (b.registeredAt || '').slice(0, 10);
+      if (fromDate && d < fromDate) return false;
+      if (toDate   && d > toDate)   return false;
+      return true;
+    });
+
+  res.json({ success: true, bls, scanResult });
 });
 
 // 수동 즉시 롤링 — 해당 대행사 HBL만 반환

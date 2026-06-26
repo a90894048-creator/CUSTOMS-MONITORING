@@ -187,20 +187,13 @@
       </div>
     </div>
 
-    <!-- 등록 폼 -->
-    <div class="add-form" style="margin-bottom:12px">
-      <input class="hbl-input" type="text" id="hbl-input" placeholder="HBL 번호 입력" autocomplete="off" />
-      <input class="year-input" type="text" id="year-input" placeholder="년도" maxlength="4" />
-      <button class="btn-add" onclick="doAddBl()">+ 등록</button>
-    </div>
-
     <!-- 조회기간 필터 -->
     <div class="date-filter">
       <label>조회기간</label>
       <input type="date" id="date-from" />
       <span style="font-size:12px;color:#888">~</span>
       <input type="date" id="date-to" />
-      <button class="btn-filter" onclick="applyDateFilter()">조회</button>
+      <button class="btn-filter" onclick="doScan()">조회</button>
       <button class="btn-filter-reset" onclick="resetDateFilter()">전체보기</button>
       <span class="filter-result" id="filter-result"></span>
     </div>
@@ -248,7 +241,6 @@
   // ── 인증 ──────────────────────────────
   document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pw-input').focus(); });
   document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-  document.getElementById('hbl-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAddBl(); });
 
   async function doLogin() {
     const code = document.getElementById('code-input').value.trim();
@@ -268,7 +260,6 @@
         document.getElementById('agency-badge').style.display = '';
         document.getElementById('rolling-badge').style.display = 'flex';
         document.getElementById('logout-btn').style.display = '';
-        document.getElementById('year-input').value = new Date().getFullYear();
         // 기본 조회기간: 오늘 기준 30일
         const today = new Date();
         const from = new Date(today); from.setDate(from.getDate() - 30);
@@ -294,12 +285,41 @@
     if (nextRollTimer) clearInterval(nextRollTimer);
   }
 
-  // ── 조회기간 필터 ──────────────────────
+  // ── XML 스캔 조회 ──────────────────────
+  async function doScan() {
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    if (!from && !to) { alert('조회기간을 설정해주세요.'); return; }
+    showLoading('수신 XML에서 HBL 검색 중...');
+    try {
+      const res = await fetch('/api/bls/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode, fromDate: from, toDate: to })
+      });
+      const data = await res.json();
+      if (data.success) {
+        allBls = data.bls;
+        renderTable(allBls);
+        const sr = data.scanResult;
+        let msg = `${allBls.length}건 표시`;
+        if (sr?.error === 'folder_not_accessible' || sr?.error === 'not_configured') {
+          msg += ' (XML 폴더 미연결 — 기등록 데이터)';
+        } else if (sr?.registered > 0) {
+          msg += ` · 신규 ${sr.registered}건 등록됨`;
+        }
+        document.getElementById('filter-result').textContent = msg;
+      }
+    } catch { alert('조회 오류가 발생했습니다.'); }
+    hideLoading();
+  }
+
+  // ── 조회기간 필터 (로컬) ──────────────
   function applyDateFilter() {
     const from = document.getElementById('date-from').value;
     const to   = document.getElementById('date-to').value;
     const filtered = allBls.filter(bl => {
-      const d = (bl.registeredAt || '').slice(0, 10);
+      const d = (bl.blDate || bl.registeredAt || '').slice(0, 10);
       if (from && d < from) return false;
       if (to   && d > to)   return false;
       return true;
@@ -308,11 +328,11 @@
     renderTable(filtered);
   }
 
-  function resetDateFilter() {
+  async function resetDateFilter() {
     document.getElementById('date-from').value = '';
     document.getElementById('date-to').value = '';
     document.getElementById('filter-result').textContent = '';
-    renderTable(allBls);
+    await loadBls();
   }
 
   // ── 카운트다운 ──────────────────────
@@ -342,29 +362,6 @@
         applyDateFilter();
       }
     } catch {}
-  }
-
-  // ── HBL 등록 ──────────────────────
-  async function doAddBl() {
-    const hblNo = document.getElementById('hbl-input').value.trim().toUpperCase();
-    const blYy = document.getElementById('year-input').value.trim();
-    if (!hblNo || !blYy) return alert('HBL 번호와 년도를 입력하세요.');
-    showLoading('HBL 등록 및 조회 중...');
-    try {
-      const res = await fetch('/api/bls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: agencyCode, hblNo, blYy })
-      });
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('hbl-input').value = '';
-        await loadBls();
-      } else {
-        alert(data.message);
-      }
-    } catch { alert('오류가 발생했습니다.'); }
-    hideLoading();
   }
 
   // ── HBL 삭제 ──────────────────────
@@ -402,7 +399,7 @@
   function renderTable(bls) {
     const tbody = document.getElementById('main-tbody');
     if (!bls || bls.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" class="empty">등록된 HBL이 없습니다.<br>위 입력창에서 HBL 번호를 등록하세요.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="empty">조회 결과가 없습니다.<br>조회기간을 설정하고 <b>조회</b> 버튼을 눌러주세요.</td></tr>';
       updateStats([]);
       return;
     }

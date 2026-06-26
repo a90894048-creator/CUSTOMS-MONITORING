@@ -34,32 +34,32 @@ function extractInfo(xml) {
   const hblM = clean.match(/<TransportContractDocument>\s*<ID>([^<]+)<\/ID>\s*<TypeCode>714<\/TypeCode>/s);
   const hblNo = hblM ? hblM[1].trim() : null;
 
-  // 연도: IssueDateTime 앞 4자리
-  const yrM = clean.match(/<IssueDateTime>(\d{4})/);
-  const blYy = yrM ? yrM[1] : String(new Date().getFullYear());
+  // 신고일자: IssueDateTime YYYYMMDD
+  const dtM = clean.match(/<IssueDateTime>(\d{4})(\d{2})(\d{2})/);
+  const blDate = dtM ? `${dtM[1]}-${dtM[2]}-${dtM[3]}` : null;
+  const blYy = dtM ? dtM[1] : String(new Date().getFullYear());
 
-  return { agencyCode, hblNo, blYy };
+  return { agencyCode, hblNo, blYy, blDate };
 }
 
 async function processFile(filePath) {
   const content = readFile(filePath);
   if (!content) return;
 
-  const { agencyCode, hblNo, blYy } = extractInfo(content);
+  const { agencyCode, hblNo, blYy, blDate } = extractInfo(content);
   if (!agencyCode || !hblNo) return;
 
   const bls = loadBls();
   if (bls.find(b => b.hblNo === hblNo && b.blYy === blYy)) return; // 이미 등록됨
 
-  console.log(`[XML감시] 신규 HBL: ${hblNo} (${blYy}) 대행사: ${agencyCode}`);
+  console.log(`[XML감시] 신규 HBL: ${hblNo} (${blDate || blYy}) 대행사: ${agencyCode}`);
 
   const result = await queryApi(hblNo, blYy);
   const now = new Date().toISOString();
   const newBl = {
-    hblNo,
-    blYy,
-    agencyCode,
-    registeredAt: now,
+    hblNo, blYy, agencyCode,
+    blDate:        blDate || null,
+    registeredAt:  now,
     currentStatus: result?.mtTrgtCargYnNm || '-',
     prgsStts:      result?.prgsStts        || '-',
     shipNm:        result?.shipNm          || '-',
@@ -79,6 +79,75 @@ async function processFile(filePath) {
   bls.push(newBl);
   saveBls(bls);
   console.log(`[XML감시] 등록 완료: ${hblNo}`);
+}
+
+// 날짜 범위 + 대행사 코드로 XML 폴더 일괄 스캔
+async function scanForAgency(agencyCode, fromDate, toDate) {
+  if (!SEND_XML_DIR) return { registered: 0, total: 0, error: 'not_configured' };
+  if (!fs.existsSync(SEND_XML_DIR)) {
+    console.warn(`[XML스캔] 폴더 접근 불가: ${SEND_XML_DIR}`);
+    return { registered: 0, total: 0, error: 'folder_not_accessible' };
+  }
+
+  let total = 0, registered = 0;
+  try {
+    const files = fs.readdirSync(SEND_XML_DIR)
+      .filter(f => f.toLowerCase().endsWith('.xml'))
+      .map(f => path.join(SEND_XML_DIR, f));
+
+    for (const file of files) {
+      const content = readFile(file);
+      if (!content) continue;
+
+      const { agencyCode: fileAgency, hblNo, blYy, blDate } = extractInfo(content);
+      if (!fileAgency || fileAgency !== agencyCode || !hblNo) continue;
+
+      // 날짜 필터
+      if (fromDate && blDate && blDate < fromDate) continue;
+      if (toDate   && blDate && blDate > toDate)   continue;
+
+      total++;
+
+      const current = loadBls();
+      if (current.find(b => b.hblNo === hblNo && b.blYy === blYy)) continue; // 이미 등록
+
+      const result = await queryApi(hblNo, blYy);
+      const now = new Date().toISOString();
+      const newBl = {
+        hblNo, blYy, agencyCode,
+        blDate:        blDate || null,
+        registeredAt:  now,
+        currentStatus: result?.mtTrgtCargYnNm || '-',
+        prgsStts:      result?.prgsStts        || '-',
+        shipNm:        result?.shipNm          || '-',
+        dsprNm:        result?.dsprNm          || '-',
+        etprDt:        result?.etprDt          || '-',
+        mblNo:         result?.mblNo           || '-',
+        lastChecked:   now,
+        scanStatus:    result ? 'ok' : 'error',
+        hasChange:     false,
+        progressHistory: [],
+      };
+
+      if (result?.mtTrgtCargYnNm && result.mtTrgtCargYnNm !== '-' && result.mtTrgtCargYnNm !== '비대상') {
+        newBl.progressHistory.push({ status: result.mtTrgtCargYnNm, detectedAt: now });
+      }
+
+      const fresh = loadBls();
+      if (!fresh.find(b => b.hblNo === hblNo && b.blYy === blYy)) {
+        fresh.push(newBl);
+        saveBls(fresh);
+        registered++;
+        console.log(`[XML스캔] 등록: ${hblNo} (${blDate})`);
+      }
+    }
+  } catch (e) {
+    console.error(`[XML스캔] 오류: ${e.message}`);
+    return { registered, total, error: e.message };
+  }
+
+  console.log(`[XML스캔] 완료 — 스캔: ${total}, 신규등록: ${registered}`);
+  return { registered, total };
 }
 
 function scan() {
@@ -112,4 +181,4 @@ function startWatcher() {
   setInterval(scan, CHECK_INTERVAL);
 }
 
-module.exports = { startWatcher };
+module.exports = { startWatcher, scanForAgency };
