@@ -282,8 +282,8 @@
     <h3>B/L 번호 입력</h3>
     <div class="bl-input-area">
       <div style="flex:1">
-        <textarea id="bl-input" placeholder="B/L 번호를 한 줄에 하나씩 입력하세요&#10;예시:&#10;HDMUSEL1234567&#10;COSU1234567890"></textarea>
-        <div class="hint">※ 한 줄에 하나씩, 최대 50건까지 조회 가능합니다.</div>
+        <textarea id="bl-input" placeholder="B/L 번호를 한 줄에 하나씩 입력하세요&#10;년도 지정 시: BL번호,년도&#10;예시:&#10;HDMUSEL1234567&#10;COSU1234567890,2024&#10;94000499505,2018"></textarea>
+        <div class="hint">※ 한 줄에 하나씩, 최대 50건 | 년도 미입력 시 올해 연도 자동 적용 | 형식: BL번호 또는 BL번호,년도</div>
       </div>
       <div class="btn-group">
         <button class="btn-primary" id="search-btn" onclick="doSearch()">조회</button>

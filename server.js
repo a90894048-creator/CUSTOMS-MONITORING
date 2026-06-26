@@ -4,6 +4,7 @@ const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const xml2js = require('xml2js');
 
 const app = express();
 app.use(cors());
@@ -11,7 +12,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const API_KEY = process.env.CUSTOMS_API_KEY;
-// 관세청 수출입화물 진행정보 조회 API (data.go.kr)
 const CUSTOMS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo';
 
 function loadAgencies() {
@@ -35,7 +35,6 @@ app.post('/api/auth', (req, res) => {
 app.post('/api/check-bls', async (req, res) => {
   const { code, blNumbers } = req.body;
 
-  // 대행사 검증
   const agencies = loadAgencies();
   const agency = agencies.find(a => a.code === code && a.active);
   if (!agency) {
@@ -48,28 +47,63 @@ app.post('/api/check-bls', async (req, res) => {
 
   const results = [];
 
-  for (const blNo of blNumbers) {
-    const trimmed = blNo.trim();
+  for (const entry of blNumbers) {
+    const trimmed = entry.trim();
     if (!trimmed) continue;
+
+    // 입력 형식: "BL번호" 또는 "BL번호,년도" (예: HDMUSEL1234567,2024)
+    const [blNo, blYy] = trimmed.split(',').map(s => s.trim());
+    const year = blYy || String(new Date().getFullYear());
 
     try {
       const response = await axios.get(CUSTOMS_API_URL, {
         params: {
           crkyCn: API_KEY,
-          mblNo: trimmed,
-          pageIndex: 1
+          mblNo: blNo,
+          blYy: year
         },
-        timeout: 10000
+        timeout: 15000,
+        headers: { 'Accept': 'application/xml' }
       });
 
-      const data = response.data;
-      // 응답 파싱 - 관세청 API는 XML 또는 JSON 반환
-      const cargList = extractCargoInfo(data, trimmed);
-      results.push(...cargList);
+      const parsed = await xml2js.parseStringPromise(response.data, { explicitArray: false });
+      const cargInfo = parsed?.cargCsclPrgsInfoQryRtnVo?.cargCsclPrgsInfoQryVo;
+
+      if (!cargInfo) {
+        results.push({ blNo, blYy: year, inspectionTarget: null, status: '정보 없음', shipNm: '-', dsprNm: '-', etprDt: '-', prgsStts: '-', csclPrgsStts: '-', hblNo: '-' });
+        continue;
+      }
+
+      // 여러 건이면 배열, 한 건이면 객체
+      const items = Array.isArray(cargInfo) ? cargInfo : [cargInfo];
+
+      for (const item of items) {
+        const mtTrgt = item.mtTrgtCargYnNm;
+        results.push({
+          blNo: item.mblNo || blNo,
+          blYy: year,
+          hblNo: item.hblNo || '-',
+          shipNm: item.shipNm || '-',
+          dsprNm: item.dsprNm || '-',
+          etprDt: item.etprDt || '-',
+          prgsStts: item.prgsStts || '-',
+          csclPrgsStts: item.csclPrgsStts || '-',
+          cargTp: item.cargTp || '-',
+          inspectionTarget: mtTrgt === 'Y' ? '대상' : mtTrgt === 'N' ? '비대상' : (mtTrgt || '확인불가'),
+          inspectionRaw: mtTrgt || '-'
+        });
+      }
     } catch (err) {
+      const errMsg = err.response?.data
+        ? await xml2js.parseStringPromise(err.response.data, { explicitArray: false })
+            .then(p => p?.cargCsclPrgsInfoQryRtnVo?.ntceInfo?.ntceCn || 'API 오류')
+            .catch(() => 'API 오류')
+        : (err.message || 'API 호출 실패');
+
       results.push({
-        blNo: trimmed,
-        error: err.response?.data?.message || err.message || 'API 호출 실패',
+        blNo,
+        blYy: year,
+        error: errMsg,
         inspectionTarget: null
       });
     }
@@ -78,31 +112,7 @@ app.post('/api/check-bls', async (req, res) => {
   res.json({ success: true, agency: agency.name, results });
 });
 
-function extractCargoInfo(data, blNo) {
-  try {
-    // data.go.kr 관세청 API JSON 응답 구조 파싱
-    const items = data?.cargCsclPrgsInfoQryVo?.cargCsclPrgsInfoQryVoList;
-    if (!items || items.length === 0) {
-      return [{ blNo, inspectionTarget: null, status: '정보 없음', shipName: '-', portName: '-', arrivalDate: '-' }];
-    }
-
-    return items.map(item => ({
-      blNo: item.mblNo || blNo,
-      hblNo: item.hblNo || '-',
-      shipName: item.vslNm || '-',
-      portName: item.dsprCntrCd || '-',
-      arrivalDate: item.etprDt || '-',
-      cargoStatus: item.cargTpcd || '-',
-      inspectionTarget: item.mgtrSbjTpcd === 'Y' ? '대상' : (item.mgtrSbjTpcd === 'N' ? '비대상' : (item.mgtrSbjTpcd || '확인불가')),
-      inspectionRaw: item.mgtrSbjTpcd || '-',
-      customsStatus: item.cargCsclPrgsSttCd || '-'
-    }));
-  } catch (e) {
-    return [{ blNo, inspectionTarget: null, error: '응답 파싱 오류', status: '-' }];
-  }
-}
-
-// 대행사 목록 조회 (관리용)
+// 대행사 목록 조회
 app.get('/api/agencies', (req, res) => {
   const agencies = loadAgencies();
   res.json({ agencies });
