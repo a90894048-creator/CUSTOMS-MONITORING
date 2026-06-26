@@ -101,6 +101,38 @@ app.get('/api/history', (req, res) => {
   res.json({ success: true, history });
 });
 
+// XML 폴더 대행사 코드 목록 확인 (진단용)
+app.get('/api/admin/xml-agents', (req, res) => {
+  const SEND_XML_DIR = process.env.SEND_XML_DIR || '';
+  if (!SEND_XML_DIR) return res.json({ success: false, message: 'SEND_XML_DIR 미설정' });
+  const fs2 = require('fs');
+  const path2 = require('path');
+  if (!fs2.existsSync(SEND_XML_DIR)) return res.json({ success: false, message: '폴더 접근 불가: ' + SEND_XML_DIR });
+
+  function stripNs(xml) {
+    return xml.replace(/\s+xmlns(?::[a-zA-Z0-9_]+)?="[^"]*"/g, '')
+              .replace(/\s+xsi:schemaLocation="[^"]*"/g, '')
+              .replace(/<(\/?)[a-zA-Z0-9_]+:([a-zA-Z0-9_])/g, '<$1$2');
+  }
+
+  const counts = {};
+  try {
+    const files = fs2.readdirSync(SEND_XML_DIR).filter(f => f.toLowerCase().endsWith('.xml'));
+    for (const f of files) {
+      try {
+        const raw = fs2.readFileSync(path2.join(SEND_XML_DIR, f), 'utf8');
+        const clean = stripNs(raw);
+        const m = clean.match(/<GoodsShipment[^>]*>[\s\S]*?<Agent>\s*<ID>([^<]{1,20})<\/ID>/);
+        const code = m ? m[1].trim() : '(없음)';
+        counts[code] = (counts[code] || 0) + 1;
+      } catch {}
+    }
+    res.json({ success: true, totalFiles: files.length, agentCodes: counts });
+  } catch (e) {
+    res.json({ success: false, message: e.message });
+  }
+});
+
 // ── 관리자 API ───────────────────────────────────────────────
 app.get('/api/admin/agencies', (req, res) => {
   res.json({ success: true, agencies: loadAgencies() });
