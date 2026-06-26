@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관세청 화물 관리대상검사 모니터링</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #003087;
+      color: #fff;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    header .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    header .subtitle { font-size: 13px; opacity: 0.75; margin-top: 2px; }
+    header .agency-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,0.15);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 13px;
+    }
+
+    /* 로그인 화면 */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 60px);
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      padding: 48px 40px;
+      width: 360px;
+      text-align: center;
+    }
+    .login-card h2 { font-size: 20px; margin-bottom: 8px; color: #003087; }
+    .login-card p { font-size: 13px; color: #666; margin-bottom: 28px; }
+    .login-card input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    .login-card input:focus { border-color: #003087; }
+    .login-card button {
+      width: 100%;
+      padding: 13px;
+      background: #003087;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-family: inherit;
+    }
+    .login-card button:hover { background: #0048c8; }
+    .login-error {
+      margin-top: 12px;
+      color: #d32f2f;
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    /* 메인 화면 */
+    #main-screen { display: none; padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+
+    .section-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      padding: 24px 28px;
+      margin-bottom: 24px;
+    }
+    .section-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #003087; }
+
+    .bl-input-area {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    textarea#bl-input {
+      flex: 1;
+      height: 120px;
+      padding: 12px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      resize: vertical;
+      font-family: 'Consolas', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea#bl-input:focus { border-color: #003087; }
+    .btn-group { display: flex; flex-direction: column; gap: 8px; }
+    .btn-primary {
+      padding: 12px 24px;
+      background: #003087;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #0048c8; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 10px 24px;
+      background: #fff;
+      color: #555;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: #888; }
+
+    .hint { font-size: 12px; color: #999; margin-top: 8px; }
+
+    /* 결과 테이블 */
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .result-header h3 { margin-bottom: 0; }
+    .result-count { font-size: 13px; color: #666; }
+
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead th {
+      background: #f5f7fa;
+      padding: 11px 14px;
+      text-align: center;
+      font-weight: 700;
+      color: #444;
+      border-bottom: 2px solid #e0e0e0;
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: center;
+    }
+    tbody tr:hover { background: #f9fbff; }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-danger { background: #fdecea; color: #c62828; }
+    .badge-safe   { background: #e8f5e9; color: #2e7d32; }
+    .badge-unknown { background: #f5f5f5; color: #777; }
+
+    /* 로딩 */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: #555;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 4px solid #ddd;
+      border-top-color: #003087;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 요약 통계 */
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      flex: 1;
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      text-align: center;
+    }
+    .stat-card .val { font-size: 28px; font-weight: 700; }
+    .stat-card .lbl { font-size: 12px; color: #888; margin-top: 4px; }
+    .stat-total .val { color: #003087; }
+    .stat-danger .val { color: #c62828; }
+    .stat-safe .val   { color: #2e7d32; }
+    .stat-unknown .val { color: #888; }
+
+    #empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #aaa;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🛃 화물 관리대상검사 모니터링</div>
+    <div class="subtitle">관세청 화물정보 API 기반</div>
+  </div>
+  <div class="agency-badge" id="agency-name-display" style="display:none"></div>
+</header>
+
+<!-- 로그인 화면 -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>대행사 코드 입력</h2>
+    <p>발급받은 대행사 코드를 입력하세요</p>
+    <input type="text" id="agency-code-input" placeholder="대행사 코드" autocomplete="off" />
+    <button onclick="doLogin()">확인</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- 메인 화면 -->
+<div id="main-screen">
+
+  <!-- 요약 통계 -->
+  <div class="stats-row" id="stats-row" style="display:none">
+    <div class="stat-card stat-total">
+      <div class="val" id="stat-total">0</div>
+      <div class="lbl">전체 B/L</div>
+    </div>
+    <div class="stat-card stat-danger">
+      <div class="val" id="stat-danger">0</div>
+      <div class="lbl">관리대상 (검사대상)</div>
+    </div>
+    <div class="stat-card stat-safe">
+      <div class="val" id="stat-safe">0</div>
+      <div class="lbl">비대상</div>
+    </div>
+    <div class="stat-card stat-unknown">
+      <div class="val" id="stat-unknown">0</div>
+      <div class="lbl">확인불가/오류</div>
+    </div>
+  </div>
+
+  <!-- B/L 입력 -->
+  <div class="section-card">
+    <h3>B/L 번호 입력</h3>
+    <div class="bl-input-area">
+      <div style="flex:1">
+        <textarea id="bl-input" placeholder="B/L 번호를 한 줄에 하나씩 입력하세요&#10;예시:&#10;HDMUSEL1234567&#10;COSU1234567890"></textarea>
+        <div class="hint">※ 한 줄에 하나씩, 최대 50건까지 조회 가능합니다.</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn-primary" id="search-btn" onclick="doSearch()">조회</button>
+        <button class="btn-secondary" onclick="clearAll()">초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 로딩 -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>관세청 API 조회 중...</div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="section-card" id="result-card" style="display:none">
+    <div class="result-header">
+      <h3>조회 결과</h3>
+      <span class="result-count" id="result-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>M B/L</th>
+            <th>H B/L</th>
+            <th>선명</th>
+            <th>입항(예정)일</th>
+            <th>양하항</th>
+            <th>화물상태</th>
+            <th>관리대상검사여부</th>
+          </tr>
+        </thead>
+        <tbody id="result-tbody"></tbody>
+      </table>
+      <div id="empty-state" style="display:none">조회된 결과가 없습니다.</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let agencyCode = '';
+  let agencyName = '';
+
+  // 로그인
+  async function doLogin() {
+    const code = document.getElementById('agency-code-input').value.trim();
+    if (!code) return;
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (data.success) {
+        agencyCode = code;
+        agencyName = data.name;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        document.getElementById('agency-name-display').textContent = '🏢 ' + agencyName;
+        document.getElementById('agency-name-display').style.display = '';
+      } else {
+        errEl.textContent = data.message;
+      }
+    } catch (e) {
+      errEl.textContent = '서버 연결 오류. 관리자에게 문의하세요.';
+    }
+  }
+
+  document.getElementById('agency-code-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // B/L 조회
+  async function doSearch() {
+    const raw = document.getElementById('bl-input').value.trim();
+    if (!raw) return;
+
+    const blNumbers = raw.split('\n').map(s => s.trim()).filter(s => s);
+    if (blNumbers.length > 50) {
+      alert('최대 50건까지 조회 가능합니다.');
+      return;
+    }
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('result-card').style.display = 'none';
+    document.getElementById('stats-row').style.display = 'none';
+    document.getElementById('search-btn').disabled = true;
+
+    try {
+      const res = await fetch('/api/check-bls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode, blNumbers })
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || '조회 실패');
+        return;
+      }
+
+      renderResults(data.results);
+    } catch (e) {
+      alert('서버 오류: ' + e.message);
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('search-btn').disabled = false;
+    }
+  }
+
+  function renderResults(results) {
+    const tbody = document.getElementById('result-tbody');
+    tbody.innerHTML = '';
+
+    let dangerCount = 0, safeCount = 0, unknownCount = 0;
+
+    if (results.length === 0) {
+      document.getElementById('empty-state').style.display = 'block';
+    } else {
+      document.getElementById('empty-state').style.display = 'none';
+      results.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        let badge = '';
+        if (r.error) {
+          badge = `<span class="badge badge-unknown">오류</span>`;
+          unknownCount++;
+        } else if (r.inspectionTarget === '대상') {
+          badge = `<span class="badge badge-danger">🔴 대상</span>`;
+          dangerCount++;
+        } else if (r.inspectionTarget === '비대상') {
+          badge = `<span class="badge badge-safe">✅ 비대상</span>`;
+          safeCount++;
+        } else {
+          badge = `<span class="badge badge-unknown">${r.inspectionTarget || '확인불가'}</span>`;
+          unknownCount++;
+        }
+
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td style="font-family:monospace;font-weight:600">${r.blNo || '-'}</td>
+          <td style="font-family:monospace">${r.hblNo || '-'}</td>
+          <td>${r.shipName || '-'}</td>
+          <td>${formatDate(r.arrivalDate)}</td>
+          <td>${r.portName || '-'}</td>
+          <td>${r.customsStatus || (r.error ? `<span style="color:#c62828;font-size:12px">${r.error}</span>` : '-')}</td>
+          <td>${badge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('result-count').textContent = `총 ${results.length}건`;
+    document.getElementById('result-card').style.display = 'block';
+
+    // 통계 업데이트
+    document.getElementById('stat-total').textContent = results.length;
+    document.getElementById('stat-danger').textContent = dangerCount;
+    document.getElementById('stat-safe').textContent = safeCount;
+    document.getElementById('stat-unknown').textContent = unknownCount;
+    document.getElementById('stats-row').style.display = 'flex';
+  }
+
+  function formatDate(d) {
+    if (!d || d === '-') return '-';
+    // YYYYMMDD → YYYY-MM-DD
+    if (d.length === 8) return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+    return d;
+  }
+
+  function clearAll() {
+    document.getElementById('bl-input').value = '';
+    document.getElementById('result-card').style.display = 'none';
+    document.getElementById('stats-row').style.display = 'none';
+  }
+</script>
+</body>
+</html>

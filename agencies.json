@@ -1,0 +1,14 @@
+{
+  "agencies": [
+    {
+      "code": "AGENCY001",
+      "name": "테스트대행사1",
+      "active": true
+    },
+    {
+      "code": "AGENCY002",
+      "name": "테스트대행사2",
+      "active": true
+    }
+  ]
+}
