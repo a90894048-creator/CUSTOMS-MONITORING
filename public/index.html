@@ -242,6 +242,14 @@
   document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pw-input').focus(); });
   document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+  // 시작일 변경 시 종료일을 +6일(7일 단위)로 자동 설정
+  document.getElementById('date-from').addEventListener('change', function () {
+    if (!this.value) return;
+    const to = new Date(this.value);
+    to.setDate(to.getDate() + 6);
+    document.getElementById('date-to').value = to.toISOString().slice(0, 10);
+  });
+
   async function doLogin() {
     const code = document.getElementById('code-input').value.trim();
     const password = document.getElementById('pw-input').value;
@@ -260,9 +268,9 @@
         document.getElementById('agency-badge').style.display = '';
         document.getElementById('rolling-badge').style.display = 'flex';
         document.getElementById('logout-btn').style.display = '';
-        // 기본 조회기간: 오늘 기준 30일
+        // 기본 조회기간: 오늘 기준 7일
         const today = new Date();
-        const from = new Date(today); from.setDate(from.getDate() - 30);
+        const from = new Date(today); from.setDate(from.getDate() - 6);
         document.getElementById('date-to').value = today.toISOString().slice(0,10);
         document.getElementById('date-from').value = from.toISOString().slice(0,10);
         await loadBls();
@@ -289,7 +297,10 @@
   async function doScan() {
     const from = document.getElementById('date-from').value;
     const to   = document.getElementById('date-to').value;
-    if (!from && !to) { alert('조회기간을 설정해주세요.'); return; }
+    if (!from || !to) { alert('조회기간(시작일~종료일)을 모두 설정해주세요.'); return; }
+    const diffDays = (new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24);
+    if (diffDays > 6) { alert('조회기간은 최대 1주일(7일)까지만 선택할 수 있습니다.'); return; }
+    if (diffDays < 0) { alert('종료일이 시작일보다 앞설 수 없습니다.'); return; }
     showLoading('수신 XML에서 HBL 검색 중...');
     try {
       const res = await fetch('/api/bls/scan', {
