@@ -3,324 +3,213 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>관세청 화물진행정보 모니터링</title>
+  <title>화물진행정보 모니터링</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f2f5; color: #222; min-height: 100vh; }
 
-    body {
-      font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
-      background: #f0f2f5;
-      color: #222;
-      min-height: 100vh;
-    }
+    header { background: #003087; color: #fff; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .header-left .logo { font-size: 18px; font-weight: 700; }
+    .header-left .sub { font-size: 11px; opacity: 0.65; margin-top: 2px; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .rolling-badge { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.12); border-radius: 20px; padding: 5px 14px; font-size: 12px; }
+    .rolling-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .agency-badge { background: rgba(255,255,255,0.15); border-radius: 20px; padding: 5px 14px; font-size: 12px; }
+    .logout-btn { background: none; border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 6px; padding: 4px 12px; font-size: 11px; cursor: pointer; font-family: inherit; }
+    .logout-btn:hover { background: rgba(255,255,255,0.1); }
 
-    header {
-      background: #003087;
-      color: #fff;
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    header .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-    header .subtitle { font-size: 13px; opacity: 0.75; margin-top: 2px; }
-    header .agency-badge {
-      margin-left: auto;
-      background: rgba(255,255,255,0.15);
-      border-radius: 20px;
-      padding: 6px 16px;
-      font-size: 13px;
-    }
-
-    /* 로그인 화면 */
-    #login-screen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: calc(100vh - 60px);
-    }
-    .login-card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
-      padding: 48px 40px;
-      width: 360px;
-      text-align: center;
-    }
+    /* 로그인 */
+    #login-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 60px); }
+    .login-card { background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 48px 40px; width: 360px; text-align: center; }
     .login-card h2 { font-size: 20px; margin-bottom: 8px; color: #003087; }
     .login-card p { font-size: 13px; color: #666; margin-bottom: 28px; }
-    .login-card input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 15px;
-      margin-bottom: 12px;
-      outline: none;
-      transition: border-color 0.2s;
-      font-family: inherit;
-    }
+    .login-card input { width: 100%; padding: 12px 16px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; outline: none; font-family: inherit; transition: border-color 0.2s; }
     .login-card input:focus { border-color: #003087; }
-    .login-card button {
-      width: 100%;
-      padding: 13px;
-      background: #003087;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      font-family: inherit;
-    }
+    .login-card button { width: 100%; padding: 13px; background: #003087; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .login-card button:hover { background: #0048c8; }
-    .login-error {
-      margin-top: 12px;
-      color: #d32f2f;
-      font-size: 13px;
-      min-height: 18px;
-    }
+    .login-error { margin-top: 10px; color: #d32f2f; font-size: 13px; min-height: 18px; }
 
-    /* 메인 화면 */
-    #main-screen { display: none; padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+    /* 메인 */
+    #main-screen { display: none; padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
 
-    .section-card {
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      padding: 24px 28px;
-      margin-bottom: 24px;
-    }
-    .section-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #003087; }
+    /* 통계 */
+    .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat { background: #fff; border-radius: 10px; padding: 14px 16px; text-align: center; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+    .stat .val { font-size: 28px; font-weight: 700; }
+    .stat .lbl { font-size: 11px; color: #888; margin-top: 3px; }
+    .s-blue .val { color: #003087; }
+    .s-red .val { color: #c62828; }
+    .s-coral .val { color: #993C1D; }
+    .s-amber .val { color: #854F0B; }
+    .s-green .val { color: #2e7d32; }
+    .s-orange .val { color: #e65100; }
 
-    .bl-input-area {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-    }
-    textarea#bl-input {
-      flex: 1;
-      height: 120px;
-      padding: 12px 14px;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      resize: vertical;
-      font-family: 'Consolas', monospace;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    textarea#bl-input:focus { border-color: #003087; }
-    .btn-group { display: flex; flex-direction: column; gap: 8px; }
-    .btn-primary {
-      padding: 12px 24px;
-      background: #003087;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      font-family: inherit;
-      transition: background 0.2s;
-    }
-    .btn-primary:hover { background: #0048c8; }
-    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
-    .btn-secondary {
-      padding: 10px 24px;
-      background: #fff;
-      color: #555;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: border-color 0.2s;
-    }
-    .btn-secondary:hover { border-color: #888; }
+    /* 카드 */
+    .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); padding: 16px 20px; margin-bottom: 16px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .card-title { font-size: 14px; font-weight: 700; color: #003087; }
 
-    .hint { font-size: 12px; color: #999; margin-top: 8px; }
+    /* 등록 폼 */
+    .add-form { display: flex; gap: 8px; align-items: center; }
+    .add-form input { padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 13px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+    .add-form input:focus { border-color: #003087; }
+    .add-form input.hbl-input { width: 180px; }
+    .add-form input.year-input { width: 70px; }
+    .btn-add { padding: 9px 18px; background: #003087; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .btn-add:hover { background: #0048c8; }
+    .btn-roll { padding: 9px 16px; background: #fff; color: #003087; border: 1.5px solid #003087; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; margin-left: auto; }
+    .btn-roll:hover { background: #f0f4ff; }
+    .btn-roll:disabled { opacity: 0.5; cursor: not-allowed; }
+    .next-roll { font-size: 12px; color: #888; }
 
-    /* 결과 테이블 */
-    .result-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
-    .result-header h3 { margin-bottom: 0; }
-    .result-count { font-size: 13px; color: #666; }
-
+    /* 테이블 */
     .table-wrap { overflow-x: auto; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    thead th {
-      background: #f5f7fa;
-      padding: 11px 14px;
-      text-align: center;
-      font-weight: 700;
-      color: #444;
-      border-bottom: 2px solid #e0e0e0;
-      white-space: nowrap;
-    }
-    tbody td {
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0f0f0;
-      text-align: center;
-    }
-    tbody tr:hover { background: #f9fbff; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th { background: #003087; color: #fff; padding: 9px 10px; text-align: center; font-weight: 700; border: 1px solid rgba(255,255,255,0.15); white-space: nowrap; }
+    thead th.sub-th { background: #1a4fa0; font-weight: 400; font-size: 11px; color: rgba(255,255,255,0.85); }
+    tbody td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; text-align: center; vertical-align: middle; }
+    tbody tr.tr-normal { background: #f7f7f7; }
+    tbody tr.tr-normal:hover { background: #ececec; }
+    tbody tr.tr-changed { background: #9e9e9e; }
+    tbody tr.tr-changed td { color: #111; font-weight: 600; }
+    tbody tr.tr-changed:hover { background: #8e8e8e; }
+    tbody tr.tr-scanning { background: #dce8f8; }
+    tbody tr.tr-error { background: #fdecea; }
+    tbody tr:last-child td { border-bottom: none; }
 
-    .badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .badge-danger { background: #fdecea; color: #c62828; }
-    .badge-safe   { background: #e8f5e9; color: #2e7d32; }
-    .badge-unknown { background: #f5f5f5; color: #777; }
+    .bl-mono { font-family: 'Consolas', monospace; font-weight: 700; font-size: 12px; text-align: left !important; }
 
-    /* 로딩 */
-    #loading {
-      display: none;
-      text-align: center;
-      padding: 40px;
-      color: #555;
-    }
-    .spinner {
-      width: 36px; height: 36px;
-      border: 4px solid #ddd;
-      border-top-color: #003087;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 12px;
-    }
+    .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .b-red    { background: #fdecea; color: #c62828; }
+    .b-amber  { background: #fff3e0; color: #e65100; }
+    .b-green  { background: #e8f5e9; color: #2e7d32; }
+    .b-blue   { background: #e3f2fd; color: #1565c0; }
+    .b-gray   { background: #f5f5f5; color: #757575; }
+    .b-coral  { background: #fbe9e7; color: #bf360c; }
+
+    .chg-mark { font-size: 10px; padding: 1px 5px; border-radius: 6px; background: rgba(0,0,0,0.15); color: #111; font-weight: 700; margin-left: 4px; }
+
+    /* 진행이력 */
+    .seq { display: flex; align-items: flex-start; gap: 5px; flex-wrap: wrap; }
+    .seq-item { display: flex; flex-direction: column; align-items: center; }
+    .seq-time { font-size: 10px; color: #555; margin-top: 2px; white-space: nowrap; }
+    .seq-arrow { font-size: 11px; color: #666; line-height: 2.2; font-weight: 700; }
+
+    /* 스피너 */
+    .spin { width: 14px; height: 14px; border: 2px solid #b3d4f5; border-top-color: #1565c0; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* 요약 통계 */
-    .stats-row {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .stat-card {
-      flex: 1;
-      background: #fff;
-      border-radius: 10px;
-      padding: 18px 20px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      text-align: center;
-    }
-    .stat-card .val { font-size: 28px; font-weight: 700; }
-    .stat-card .lbl { font-size: 12px; color: #888; margin-top: 4px; }
-    .stat-total .val { color: #003087; }
-    .stat-danger .val { color: #c62828; }
-    .stat-safe .val   { color: #2e7d32; }
-    .stat-unknown .val { color: #888; }
+    /* 삭제버튼 */
+    .btn-del { background: none; border: none; color: #bbb; cursor: pointer; font-size: 16px; padding: 0 4px; line-height: 1; }
+    .btn-del:hover { color: #c62828; }
 
-    #empty-state {
-      text-align: center;
-      padding: 40px;
-      color: #aaa;
-      font-size: 14px;
-    }
+    .legend { display: flex; gap: 14px; margin-bottom: 10px; font-size: 11px; color: #666; align-items: center; }
+    .leg { display: flex; align-items: center; gap: 5px; }
+    .leg-box { width: 14px; height: 14px; border-radius: 3px; }
+
+    #loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 999; align-items: center; justify-content: center; }
+    #loading-overlay.show { display: flex; }
+    .loading-box { background: #fff; border-radius: 12px; padding: 28px 36px; text-align: center; font-size: 14px; }
+    .loading-box .spin-lg { width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #003087; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+
+    .empty { text-align: center; padding: 40px; color: #bbb; font-size: 13px; }
   </style>
 </head>
 <body>
 
 <header>
-  <div>
+  <div class="header-left">
     <div class="logo">🛃 화물진행정보 모니터링</div>
-    <div class="subtitle">관세청 화물정보 API 기반</div>
+    <div class="sub">관세청 화물정보 API · HBL 자동 롤링 조회</div>
   </div>
-  <div class="agency-badge" id="agency-name-display" style="display:none"></div>
+  <div class="header-right">
+    <div class="rolling-badge" id="rolling-badge" style="display:none">
+      <div class="rolling-dot"></div>
+      <span>롤링 중 · 10분 간격</span>
+    </div>
+    <div class="agency-badge" id="agency-badge" style="display:none"></div>
+    <button class="logout-btn" id="logout-btn" style="display:none" onclick="doLogout()">로그아웃</button>
+  </div>
 </header>
 
-<!-- 로그인 화면 -->
+<!-- 로딩 오버레이 -->
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="spin-lg"></div>
+    <div id="loading-msg">처리 중...</div>
+  </div>
+</div>
+
+<!-- 로그인 -->
 <div id="login-screen">
   <div class="login-card">
     <h2>대행사 코드 입력</h2>
     <p>발급받은 대행사 코드를 입력하세요</p>
-    <input type="text" id="agency-code-input" placeholder="대행사 코드" autocomplete="off" />
+    <input type="text" id="code-input" placeholder="대행사 코드" autocomplete="off" />
     <button onclick="doLogin()">확인</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
 
-<!-- 메인 화면 -->
+<!-- 메인 -->
 <div id="main-screen">
 
-  <!-- 요약 통계 -->
-  <div class="stats-row" id="stats-row" style="display:none">
-    <div class="stat-card stat-total">
-      <div class="val" id="stat-total">0</div>
-      <div class="lbl">전체 B/L</div>
-    </div>
-    <div class="stat-card stat-danger">
-      <div class="val" id="stat-danger">0</div>
-      <div class="lbl">관리대상 (검사대상)</div>
-    </div>
-    <div class="stat-card stat-safe">
-      <div class="val" id="stat-safe">0</div>
-      <div class="lbl">비대상</div>
-    </div>
-    <div class="stat-card stat-unknown">
-      <div class="val" id="stat-unknown">0</div>
-      <div class="lbl">확인불가/오류</div>
-    </div>
+  <!-- 통계 -->
+  <div class="stats">
+    <div class="stat s-blue"><div class="val" id="s-total">0</div><div class="lbl">전체 HBL</div></div>
+    <div class="stat s-red"><div class="val" id="s-target">0</div><div class="lbl">관리대상</div></div>
+    <div class="stat s-coral"><div class="val" id="s-immediate">0</div><div class="lbl">즉시검사</div></div>
+    <div class="stat s-amber"><div class="val" id="s-inprogress">0</div><div class="lbl">검사진행중</div></div>
+    <div class="stat s-green"><div class="val" id="s-done">0</div><div class="lbl">검사완료/비대상</div></div>
+    <div class="stat s-orange"><div class="val" id="s-changed">0</div><div class="lbl">상태변화 감지</div></div>
   </div>
 
-  <!-- B/L 입력 -->
-  <div class="section-card">
-    <h3>B/L 번호 입력</h3>
-    <div class="bl-input-area">
-      <div style="flex:1">
-        <textarea id="bl-input" placeholder="B/L 번호를 한 줄에 하나씩 입력하세요&#10;년도 지정 시: BL번호,년도&#10;예시:&#10;HDMUSEL1234567&#10;COSU1234567890,2024&#10;94000499505,2018"></textarea>
-        <div class="hint">※ 한 줄에 하나씩, 최대 50건 | 년도 미입력 시 올해 연도 자동 적용 | 형식: BL번호 또는 BL번호,년도</div>
-      </div>
-      <div class="btn-group">
-        <button class="btn-primary" id="search-btn" onclick="doSearch()">조회</button>
-        <button class="btn-secondary" onclick="clearAll()">초기화</button>
+  <!-- HBL 등록 + 테이블 -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">전체 HBL 모니터링 현황</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="next-roll" id="next-roll-text"></span>
+        <button class="btn-roll" id="btn-roll" onclick="doRollNow()">▶ 지금 조회</button>
       </div>
     </div>
-  </div>
 
-  <!-- 로딩 -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <div>관세청 API 조회 중...</div>
-  </div>
-
-  <!-- 결과 -->
-  <div class="section-card" id="result-card" style="display:none">
-    <div class="result-header">
-      <h3>조회 결과</h3>
-      <span class="result-count" id="result-count"></span>
+    <!-- 등록 폼 -->
+    <div class="add-form" style="margin-bottom:12px">
+      <input class="hbl-input" type="text" id="hbl-input" placeholder="HBL 번호 입력" autocomplete="off" />
+      <input class="year-input" type="text" id="year-input" placeholder="년도" maxlength="4" />
+      <button class="btn-add" onclick="doAddBl()">+ 등록</button>
     </div>
+
+    <!-- 범례 -->
+    <div class="legend">
+      <div class="leg"><div class="leg-box" style="background:#dce8f8;border:1px solid #aac"></div> 조회중</div>
+      <div class="leg"><div class="leg-box" style="background:#9e9e9e"></div> 상태변화 감지</div>
+      <div class="leg"><div class="leg-box" style="background:#f7f7f7;border:1px solid #ddd"></div> 정상</div>
+      <div id="last-updated" style="margin-left:auto;font-size:11px;color:#aaa"></div>
+    </div>
+
     <div class="table-wrap">
-      <table>
+      <table id="main-table">
         <thead>
           <tr>
-            <th>#</th>
-            <th>M B/L</th>
-            <th>H B/L</th>
-            <th>선명</th>
-            <th>입항(예정)일</th>
-            <th>양하항</th>
-            <th>화물상태</th>
-            <th>관리대상검사여부</th>
+            <th style="width:32px">#</th>
+            <th style="width:130px;text-align:left;padding-left:12px">HBL 번호</th>
+            <th style="width:110px">선명</th>
+            <th style="width:60px">입항일</th>
+            <th style="width:54px">양하항</th>
+            <th style="width:80px">통관상태</th>
+            <th style="width:64px">관리대상</th>
+            <th>관리진행상황 (순차 이력 · 자동 기록)</th>
+            <th style="width:58px">최종조회</th>
+            <th style="width:32px"></th>
           </tr>
         </thead>
-        <tbody id="result-tbody"></tbody>
+        <tbody id="main-tbody">
+          <tr><td colspan="10" class="empty">등록된 HBL이 없습니다.<br>위 입력창에서 HBL 번호를 등록하세요.</td></tr>
+        </tbody>
       </table>
-      <div id="empty-state" style="display:none">조회된 결과가 없습니다.</div>
     </div>
   </div>
 
@@ -329,141 +218,225 @@
 <script>
   let agencyCode = '';
   let agencyName = '';
+  let nextRollTimer = null;
+  const ROLL_INTERVAL = 10 * 60; // 10분(초)
 
-  // 로그인
+  // ── 인증 ──────────────────────────────
+  document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('hbl-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAddBl(); });
+
   async function doLogin() {
-    const code = document.getElementById('agency-code-input').value.trim();
+    const code = document.getElementById('code-input').value.trim();
     if (!code) return;
     const errEl = document.getElementById('login-error');
     errEl.textContent = '';
-
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
+      const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
       const data = await res.json();
       if (data.success) {
         agencyCode = code;
         agencyName = data.name;
         document.getElementById('login-screen').style.display = 'none';
         document.getElementById('main-screen').style.display = 'block';
-        document.getElementById('agency-name-display').textContent = '🏢 ' + agencyName;
-        document.getElementById('agency-name-display').style.display = '';
+        document.getElementById('agency-badge').textContent = '🏢 ' + agencyName;
+        document.getElementById('agency-badge').style.display = '';
+        document.getElementById('rolling-badge').style.display = 'flex';
+        document.getElementById('logout-btn').style.display = '';
+        document.getElementById('year-input').value = new Date().getFullYear();
+        await loadBls();
+        startCountdown();
       } else {
         errEl.textContent = data.message;
       }
-    } catch (e) {
-      errEl.textContent = '서버 연결 오류. 관리자에게 문의하세요.';
-    }
+    } catch { errEl.textContent = '서버 연결 오류'; }
   }
 
-  document.getElementById('agency-code-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-  });
+  function doLogout() {
+    agencyCode = ''; agencyName = '';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('main-screen').style.display = 'none';
+    document.getElementById('agency-badge').style.display = 'none';
+    document.getElementById('rolling-badge').style.display = 'none';
+    document.getElementById('logout-btn').style.display = 'none';
+    document.getElementById('code-input').value = '';
+    if (nextRollTimer) clearInterval(nextRollTimer);
+  }
 
-  // B/L 조회
-  async function doSearch() {
-    const raw = document.getElementById('bl-input').value.trim();
-    if (!raw) return;
+  // ── 카운트다운 ──────────────────────
+  let secondsLeft = ROLL_INTERVAL;
+  function startCountdown() {
+    secondsLeft = ROLL_INTERVAL;
+    if (nextRollTimer) clearInterval(nextRollTimer);
+    nextRollTimer = setInterval(() => {
+      secondsLeft--;
+      const m = Math.floor(secondsLeft / 60);
+      const s = secondsLeft % 60;
+      document.getElementById('next-roll-text').textContent = `다음 조회까지 ${m}분 ${String(s).padStart(2,'0')}초`;
+      if (secondsLeft <= 0) {
+        secondsLeft = ROLL_INTERVAL;
+        loadBls();
+      }
+    }, 1000);
+  }
 
-    const blNumbers = raw.split('\n').map(s => s.trim()).filter(s => s);
-    if (blNumbers.length > 50) {
-      alert('최대 50건까지 조회 가능합니다.');
+  // ── HBL 목록 로드 ──────────────────
+  async function loadBls() {
+    try {
+      const res = await fetch(`/api/bls?code=${agencyCode}`);
+      const data = await res.json();
+      if (data.success) renderTable(data.bls);
+    } catch {}
+  }
+
+  // ── HBL 등록 ──────────────────────
+  async function doAddBl() {
+    const hblNo = document.getElementById('hbl-input').value.trim().toUpperCase();
+    const blYy = document.getElementById('year-input').value.trim();
+    if (!hblNo || !blYy) return alert('HBL 번호와 년도를 입력하세요.');
+    showLoading('HBL 등록 및 조회 중...');
+    try {
+      const res = await fetch('/api/bls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode, hblNo, blYy })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('hbl-input').value = '';
+        await loadBls();
+      } else {
+        alert(data.message);
+      }
+    } catch { alert('오류가 발생했습니다.'); }
+    hideLoading();
+  }
+
+  // ── HBL 삭제 ──────────────────────
+  async function doDeleteBl(hblNo) {
+    if (!confirm(`${hblNo} 을(를) 모니터링 목록에서 삭제하시겠습니까?`)) return;
+    try {
+      await fetch(`/api/bls/${hblNo}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode })
+      });
+      await loadBls();
+    } catch {}
+  }
+
+  // ── 지금 롤링 ──────────────────────
+  async function doRollNow() {
+    const btn = document.getElementById('btn-roll');
+    btn.disabled = true;
+    showLoading('전체 HBL 조회 중...');
+    try {
+      const res = await fetch('/api/roll-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: agencyCode })
+      });
+      const data = await res.json();
+      if (data.success) { renderTable(data.bls); secondsLeft = ROLL_INTERVAL; }
+    } catch {}
+    hideLoading();
+    btn.disabled = false;
+  }
+
+  // ── 테이블 렌더 ────────────────────
+  function renderTable(bls) {
+    const tbody = document.getElementById('main-tbody');
+    if (!bls || bls.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="empty">등록된 HBL이 없습니다.<br>위 입력창에서 HBL 번호를 등록하세요.</td></tr>';
+      updateStats([]);
       return;
     }
 
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('result-card').style.display = 'none';
-    document.getElementById('stats-row').style.display = 'none';
-    document.getElementById('search-btn').disabled = true;
+    tbody.innerHTML = bls.map((bl, i) => {
+      const trClass = bl.scanStatus === 'error' ? 'tr-error' : bl.hasChange ? 'tr-changed' : 'tr-normal';
+      const statusBadge = renderStatusBadge(bl.currentStatus);
+      const prgssBadge = renderPrgsBadge(bl.prgsStts);
+      const seqHtml = renderSeq(bl);
+      const lastChecked = bl.lastChecked ? formatTime(bl.lastChecked) : '-';
+      const chgMark = bl.hasChange ? '<span class="chg-mark">변화</span>' : '';
 
-    try {
-      const res = await fetch('/api/check-bls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: agencyCode, blNumbers })
-      });
-      const data = await res.json();
+      return `<tr class="${trClass}">
+        <td>${i + 1}</td>
+        <td class="bl-mono">${bl.hblNo}${chgMark}</td>
+        <td>${bl.shipNm || '-'}</td>
+        <td>${formatDate(bl.etprDt)}</td>
+        <td>${bl.dsprNm || '-'}</td>
+        <td>${prgssBadge}</td>
+        <td>${statusBadge}</td>
+        <td style="text-align:left">${seqHtml}</td>
+        <td style="font-size:11px;color:${bl.hasChange ? '#333' : '#aaa'}">${bl.scanStatus === 'scanning' ? '<div class="spin"></div>' : lastChecked}</td>
+        <td><button class="btn-del" onclick="doDeleteBl('${bl.hblNo}')" title="삭제">×</button></td>
+      </tr>`;
+    }).join('');
 
-      if (!data.success) {
-        alert(data.message || '조회 실패');
-        return;
-      }
-
-      renderResults(data.results);
-    } catch (e) {
-      alert('서버 오류: ' + e.message);
-    } finally {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('search-btn').disabled = false;
-    }
+    updateStats(bls);
+    document.getElementById('last-updated').textContent = '마지막 갱신 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   }
 
-  function renderResults(results) {
-    const tbody = document.getElementById('result-tbody');
-    tbody.innerHTML = '';
+  function renderStatusBadge(status) {
+    if (!status || status === '-') return '<span class="badge b-gray">확인중</span>';
+    if (status === '검사완료') return '<span class="badge b-green">검사완료</span>';
+    if (status === '비대상')  return '<span class="badge b-green">비대상</span>';
+    if (status === '즉시검사') return '<span class="badge b-coral">즉시검사</span>';
+    if (status.includes('진행')) return '<span class="badge b-amber">검사진행중</span>';
+    return `<span class="badge b-red">${status}</span>`;
+  }
 
-    let dangerCount = 0, safeCount = 0, unknownCount = 0;
+  function renderPrgsBadge(prgsStts) {
+    if (!prgsStts || prgsStts === '-') return '<span class="badge b-gray">-</span>';
+    if (prgsStts.includes('반출완료')) return '<span class="badge b-green">반출완료</span>';
+    if (prgsStts.includes('수입신고수리')) return '<span class="badge b-blue">수입신고수리</span>';
+    if (prgsStts.includes('하선')) return '<span class="badge b-gray">하선신고수리</span>';
+    return `<span class="badge b-gray">${prgsStts}</span>`;
+  }
 
-    if (results.length === 0) {
-      document.getElementById('empty-state').style.display = 'block';
-    } else {
-      document.getElementById('empty-state').style.display = 'none';
-      results.forEach((r, i) => {
-        const tr = document.createElement('tr');
-        let badge = '';
-        if (r.error) {
-          badge = `<span class="badge badge-unknown">오류</span>`;
-          unknownCount++;
-        } else if (r.inspectionTarget === '대상') {
-          badge = `<span class="badge badge-danger">🔴 대상</span>`;
-          dangerCount++;
-        } else if (r.inspectionTarget === '비대상') {
-          badge = `<span class="badge badge-safe">✅ 비대상</span>`;
-          safeCount++;
-        } else {
-          badge = `<span class="badge badge-unknown">${r.inspectionTarget || '확인불가'}</span>`;
-          unknownCount++;
-        }
-
-        tr.innerHTML = `
-          <td>${i + 1}</td>
-          <td style="font-family:monospace;font-weight:600">${r.blNo || '-'}</td>
-          <td style="font-family:monospace">${r.hblNo || '-'}</td>
-          <td>${r.shipName || '-'}</td>
-          <td>${formatDate(r.arrivalDate)}</td>
-          <td>${r.portName || '-'}</td>
-          <td>${r.customsStatus || (r.error ? `<span style="color:#c62828;font-size:12px">${r.error}</span>` : '-')}</td>
-          <td>${badge}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+  function renderSeq(bl) {
+    const hist = bl.progressHistory || [];
+    if (hist.length === 0) {
+      if (bl.currentStatus === '비대상' || !bl.currentStatus || bl.currentStatus === '-') {
+        return '<span style="color:#bbb;font-size:11px">— 해당없음 —</span>';
+      }
+      return '<span style="color:#bbb;font-size:11px">— 이력 없음 —</span>';
     }
+    return '<div class="seq">' + hist.map((h, idx) => {
+      const isLast = idx === hist.length - 1;
+      const badge = renderStatusBadge(h.status).replace('badge b-', 'badge b-');
+      const arrow = isLast ? '' : '<span class="seq-arrow">→</span>';
+      return `<div class="seq-item">${badge.replace('</span>', (isLast ? ' ◀</span>' : '</span>'))}<span class="seq-time">${formatTime(h.detectedAt)}</span></div>${arrow}`;
+    }).join('') + '</div>';
+  }
 
-    document.getElementById('result-count').textContent = `총 ${results.length}건`;
-    document.getElementById('result-card').style.display = 'block';
-
-    // 통계 업데이트
-    document.getElementById('stat-total').textContent = results.length;
-    document.getElementById('stat-danger').textContent = dangerCount;
-    document.getElementById('stat-safe').textContent = safeCount;
-    document.getElementById('stat-unknown').textContent = unknownCount;
-    document.getElementById('stats-row').style.display = 'flex';
+  function updateStats(bls) {
+    document.getElementById('s-total').textContent = bls.length;
+    document.getElementById('s-target').textContent = bls.filter(b => b.currentStatus && b.currentStatus !== '비대상' && b.currentStatus !== '-').length;
+    document.getElementById('s-immediate').textContent = bls.filter(b => b.currentStatus === '즉시검사').length;
+    document.getElementById('s-inprogress').textContent = bls.filter(b => b.currentStatus && b.currentStatus.includes('진행')).length;
+    document.getElementById('s-done').textContent = bls.filter(b => b.currentStatus === '검사완료' || b.currentStatus === '비대상').length;
+    document.getElementById('s-changed').textContent = bls.filter(b => b.hasChange).length;
   }
 
   function formatDate(d) {
     if (!d || d === '-') return '-';
-    // YYYYMMDD → YYYY-MM-DD
-    if (d.length === 8) return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+    if (d.length === 8) return `${d.slice(4,6)}-${d.slice(6,8)}`;
     return d;
   }
 
-  function clearAll() {
-    document.getElementById('bl-input').value = '';
-    document.getElementById('result-card').style.display = 'none';
-    document.getElementById('stats-row').style.display = 'none';
+  function formatTime(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+
+  function showLoading(msg) {
+    document.getElementById('loading-msg').textContent = msg || '처리 중...';
+    document.getElementById('loading-overlay').classList.add('show');
+  }
+  function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('show');
   }
 </script>
 </body>
